@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<resources>
+    <declare-styleable name="DoraParallaxLayout">
+        <attr name="dview_pl_orientation" format="enum">
+            <enum name="horizontal" value="0" />
+            <enum name="vertical" value="1" />
+        </attr>
+        <attr name="dview_pl_initialScrollOffset" format="dimension" />
+    </declare-styleable>
+    <declare-styleable name="DoraParallaxLayout_Layout">
+        <attr name="dview_pl_translation_x" format="dimension" />
+        <attr name="dview_pl_translation_y" format="dimension" />
+        <attr name="dview_pl_scale_x" format="float" />
+        <attr name="dview_pl_scale_y" format="float" />
+        <attr name="dview_pl_alpha" format="float" />
+        <attr name="dview_pl_rotation" format="float" />
+    </declare-styleable>
+</resources>
