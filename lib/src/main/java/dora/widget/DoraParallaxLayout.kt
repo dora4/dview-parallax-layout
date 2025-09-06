@@ -1,108 +1,31 @@
 package dora.widget
 
 import android.content.Context
+import android.graphics.Rect
 import android.util.AttributeSet
+import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import androidx.core.view.children
-import androidx.core.view.doOnPreDraw
 import dora.widget.parallaxlayout.R
 
 class DoraParallaxLayout @JvmOverloads constructor(
-    context: Context,
-    attrs: AttributeSet? = null,
-    defStyleAttr: Int = 0
-) : FrameLayout(context, attrs, defStyleAttr) {
+    context: Context, attrs: AttributeSet? = null
+) : FrameLayout(context, attrs) {
 
-    private var orientation: Int = 0
-    private var initialOffset: Int = 0
-    private lateinit var scrollContainer: ViewGroup
+    private var orientation: Int = 1
+    private var initialScrollOffset: Float = 0f
 
     init {
-        context.theme.obtainStyledAttributes(attrs, R.styleable.DoraParallaxLayout, 0, 0).apply {
-            try {
-                orientation = getInt(R.styleable.DoraParallaxLayout_dview_pl_orientation, 0)
-                initialOffset = getDimensionPixelSize(
-                    R.styleable.DoraParallaxLayout_dview_pl_initialScrollOffset, 0
-                )
-            } finally {
-                recycle()
-            }
-        }
-    }
-
-    override fun onFinishInflate() {
-        super.onFinishInflate()
-        val originalChildren = children.toList()
-        removeAllViews()
-        scrollContainer = if (orientation == 1) {
-            object : ScrollView(context) {
-                override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
-                    super.onScrollChanged(l, t, oldl, oldt)
-                    applyParallax(l, t)
-                }
-            }.apply { overScrollMode = OVER_SCROLL_NEVER }
-        } else {
-            object : HorizontalScrollView(context) {
-                override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
-                    super.onScrollChanged(l, t, oldl, oldt)
-                    applyParallax(l, t)
-                }
-            }.apply { overScrollMode = OVER_SCROLL_NEVER }
-        }
-
-        val linear = LinearLayout(context).apply {
-            orientation = if (orientation == 1) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
-            layoutParams = LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        }
-        scrollContainer.layoutParams = LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        )
-        scrollContainer.addView(linear)
-        addView(scrollContainer)
-
-        originalChildren.forEach { linear.addView(it) }
-
-        scrollContainer.doOnPreDraw {
-            if (initialOffset != 0) {
-                if (orientation == 1) scrollContainer.scrollTo(0, initialOffset)
-                else (scrollContainer as HorizontalScrollView).scrollTo(initialOffset, 0)
-                initialOffset = 0
-            }
-            applyParallax(
-                scrollContainer.scrollX,
-                scrollContainer.scrollY
-            )
-        }
-    }
-
-    private fun applyParallax(scrollX: Int, scrollY: Int) {
-        val container = (scrollContainer.getChildAt(0) as? ViewGroup) ?: return
-        val maxScroll = if (orientation == 1)
-            (container.height - height).coerceAtLeast(1)
-        else (container.width - width).coerceAtLeast(1)
-        val fraction = if (orientation == 1) scrollY.toFloat() / maxScroll else scrollX.toFloat() / maxScroll
-
-        container.children.forEach { child ->
-            val lp = child.layoutParams as LayoutParams
-            child.translationX = if (orientation == 1) 0f else lp.parallaxTranslationX * fraction
-            child.translationY = if (orientation == 1) lp.parallaxTranslationY * fraction else 0f
-            child.scaleX = 1f + (lp.parallaxScaleX - 1f) * fraction
-            child.scaleY = 1f + (lp.parallaxScaleY - 1f) * fraction
-            child.alpha = 1f + (lp.parallaxAlpha - 1f) * fraction
-            child.rotation = lp.parallaxRotation * fraction
+        attrs?.let {
+            val ta = context.obtainStyledAttributes(it, R.styleable.DoraParallaxLayout)
+            orientation = ta.getInt(R.styleable.DoraParallaxLayout_dview_pl_orientation, 1)
+            initialScrollOffset = ta.getDimension(R.styleable.DoraParallaxLayout_dview_pl_initialScrollOffset, 0f)
+            ta.recycle()
         }
     }
 
     override fun generateDefaultLayoutParams(): FrameLayout.LayoutParams {
-        return FrameLayout.LayoutParams(
+        return LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
@@ -112,48 +35,86 @@ class DoraParallaxLayout @JvmOverloads constructor(
         return LayoutParams(lp!!)
     }
 
-    override fun checkLayoutParams(p: ViewGroup.LayoutParams?) = p is FrameLayout.LayoutParams
+    override fun checkLayoutParams(p: ViewGroup.LayoutParams?) = p is LayoutParams
+
+    override fun generateLayoutParams(attrs: AttributeSet?): FrameLayout.LayoutParams {
+        return LayoutParams(context, attrs)
+    }
 
     class LayoutParams : FrameLayout.LayoutParams {
 
-        var parallaxTranslationX: Int = 0
-        var parallaxTranslationY: Int = 0
-        var parallaxScaleX: Float = 1f
-        var parallaxScaleY: Float = 1f
-        var parallaxAlpha: Float = 1f
-        var parallaxRotation: Float = 0f
+        var translationXAttr: Float = 0f
+        var translationYAttr: Float = 0f
+        var scaleXAttr: Float = 1f
+        var scaleYAttr: Float = 1f
+        var alphaAttr: Float = 1f
+        var rotationAttr: Float = 0f
+        var animationStartFraction: Float = 0.5f // 默认可见50%触发动画
+        var animationTriggered: Boolean = false
 
-        constructor(c: Context, attrs: AttributeSet) : super(c, attrs) {
-            c.theme.obtainStyledAttributes(
-                attrs, R.styleable.DoraParallaxLayout_Layout, 0, 0
-            ).apply {
-                try {
-                    parallaxTranslationX = getDimensionPixelOffset(
-                        R.styleable.DoraParallaxLayout_Layout_dview_pl_translation_x, 0
-                    )
-                    parallaxTranslationY = getDimensionPixelOffset(
-                        R.styleable.DoraParallaxLayout_Layout_dview_pl_translation_y, 0
-                    )
-                    parallaxScaleX = getFloat(
-                        R.styleable.DoraParallaxLayout_Layout_dview_pl_scale_x, 1f
-                    )
-                    parallaxScaleY = getFloat(
-                        R.styleable.DoraParallaxLayout_Layout_dview_pl_scale_y, 1f
-                    )
-                    parallaxAlpha = getFloat(
-                        R.styleable.DoraParallaxLayout_Layout_dview_pl_alpha, 1f
-                    )
-                    parallaxRotation = getFloat(
-                        R.styleable.DoraParallaxLayout_Layout_dview_pl_rotation, 0f
-                    )
-                } finally {
-                    recycle()
-                }
+        constructor(c: Context, attrs: AttributeSet?) : super(c, attrs) {
+            attrs?.let {
+                val ta = c.obtainStyledAttributes(it, R.styleable.DoraParallaxLayout_Layout)
+                translationXAttr = ta.getDimension(R.styleable.DoraParallaxLayout_Layout_dview_pl_translation_x, 0f)
+                translationYAttr = ta.getDimension(R.styleable.DoraParallaxLayout_Layout_dview_pl_translation_y, 0f)
+                scaleXAttr = ta.getFloat(R.styleable.DoraParallaxLayout_Layout_dview_pl_scale_x, 1f)
+                scaleYAttr = ta.getFloat(R.styleable.DoraParallaxLayout_Layout_dview_pl_scale_y, 1f)
+                alphaAttr = ta.getFloat(R.styleable.DoraParallaxLayout_Layout_dview_pl_alpha, 1f)
+                rotationAttr = ta.getFloat(R.styleable.DoraParallaxLayout_Layout_dview_pl_rotation, 0f)
+                ta.recycle()
             }
         }
 
         constructor(width: Int, height: Int) : super(width, height)
-
         constructor(source: ViewGroup.LayoutParams) : super(source)
+    }
+
+    fun checkChildVisibilityAndAnimate() {
+        val parentRect = Rect()
+        if (!getGlobalVisibleRect(parentRect)) return
+
+        for (i in 0 until childCount) {
+            val child = getChildAt(i)
+            val lp = child.layoutParams as? LayoutParams ?: continue
+            if (lp.animationTriggered) continue
+
+            val childRect = Rect()
+            if (!child.getGlobalVisibleRect(childRect)) continue
+
+            val intersectRect = Rect()
+            val visible = intersectRect.setIntersect(parentRect, childRect)
+            if (!visible) continue
+
+            val fraction = intersectRect.height().toFloat() / child.height
+            if (fraction >= lp.animationStartFraction) {
+                lp.animationTriggered = true
+                startChildAnimation(child, lp)
+            }
+        }
+    }
+
+    private fun startChildAnimation(child: View, lp: LayoutParams) {
+        child.animate()
+            .translationX(lp.translationXAttr)
+            .translationY(lp.translationYAttr)
+            .scaleX(lp.scaleXAttr)
+            .scaleY(lp.scaleYAttr)
+            .alpha(lp.alphaAttr)
+            .rotation(lp.rotationAttr)
+            .setDuration(400)
+            .start()
+    }
+
+    fun onScrollChanged() {
+        checkChildVisibilityAndAnimate()
+    }
+
+    fun scrollToOffset(offset: Float) {
+        if (orientation == 0) {
+            scrollTo(offset.toInt(), scrollY)
+        } else {
+            scrollTo(scrollX, offset.toInt())
+        }
+        checkChildVisibilityAndAnimate()
     }
 }
