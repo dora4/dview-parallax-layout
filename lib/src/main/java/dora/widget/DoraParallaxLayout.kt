@@ -101,16 +101,20 @@ class DoraParallaxLayout @JvmOverloads constructor(
         }
     }
 
-    override fun generateLayoutParams(lp: ViewGroup.LayoutParams?): ViewGroup.LayoutParams {
-        return  LayoutParams(
+    override fun generateDefaultLayoutParams(): FrameLayout.LayoutParams {
+        return FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
     }
 
-    override fun checkLayoutParams(p: ViewGroup.LayoutParams?) = p is LayoutParams
+    override fun generateLayoutParams(lp: ViewGroup.LayoutParams?): ViewGroup.LayoutParams {
+        return LayoutParams(lp!!)
+    }
 
-    class LayoutParams : MarginLayoutParams {
+    override fun checkLayoutParams(p: ViewGroup.LayoutParams?) = p is FrameLayout.LayoutParams
+
+    class LayoutParams : FrameLayout.LayoutParams {
 
         var parallaxTranslationX: Int = 0
         var parallaxTranslationY: Int = 0
